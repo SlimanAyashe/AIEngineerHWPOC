@@ -1,0 +1,29 @@
+[
+  {
+    "id": "OPP-1001",
+    "account_id": "ACC-001",
+    "name": "Acme - DTG Printer Fleet",
+    "stage": "Proposal",
+    "amount": 320000,
+    "close_date": "2026-08-15",
+    "owner": "alice"
+  },
+  {
+    "id": "OPP-1002",
+    "account_id": "ACC-001",
+    "name": "Acme - Ink Subscription Renewal",
+    "stage": "Negotiation",
+    "amount": 95000,
+    "close_date": "2026-07-30",
+    "owner": "alice"
+  },
+  {
+    "id": "OPP-2001",
+    "account_id": "ACC-002",
+    "name": "Globex - Production Line Upgrade",
+    "stage": "Qualification",
+    "amount": 540000,
+    "close_date": "2026-09-20",
+    "owner": "alice"
+  }
+]

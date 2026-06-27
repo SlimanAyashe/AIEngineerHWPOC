@@ -1,0 +1,29 @@
+[
+  {
+    "id": "ACC-001",
+    "name": "Acme Corporation",
+    "industry": "Apparel Manufacturing",
+    "owner": "alice",
+    "annual_revenue": 5200000,
+    "region": "EMEA",
+    "health": "at_risk"
+  },
+  {
+    "id": "ACC-002",
+    "name": "Globex Industries",
+    "industry": "Logistics",
+    "owner": "alice",
+    "annual_revenue": 8700000,
+    "region": "AMER",
+    "health": "healthy"
+  },
+  {
+    "id": "ACC-003",
+    "name": "Initech LLC",
+    "industry": "Textile Printing",
+    "owner": "carol",
+    "annual_revenue": 1200000,
+    "region": "EMEA",
+    "health": "healthy"
+  }
+]
