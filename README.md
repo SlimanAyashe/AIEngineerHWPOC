@@ -87,8 +87,12 @@ poc/
 the policy gate, and the audit shape — those are the design.
 
 **Changes (swap implementations behind the same interfaces):**
-- `identity.obo_exchange` → real OAuth2 On-Behalf-Of against Microsoft Entra ID.
+- `identity.obo_exchange` → a true Entra ID On-Behalf-Of grant for Microsoft
+  Graph/SharePoint, and per-connector delegated OAuth token brokers for Salesforce
+  and Jira (their own authorization servers) — all acting *as the user*.
 - `store` mock lists → real Salesforce REST / Jira REST / Microsoft Graph calls.
 - `validation` → pydantic / JSON Schema.
 - `audit` sink → Azure Log Analytics → Microsoft Sentinel.
-- approval `return` → enqueue to Azure Service Bus, notify approver, resume on approval.
+- approval `return` → enqueue to Azure Service Bus, notify the approver named by
+  `approval_route` (requesting rep, or a distinct deal-desk approver for binding
+  actions), and resume on approval after **re-validating** permissions.

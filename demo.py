@@ -31,7 +31,10 @@ def show(title: str, result) -> None:
     if result.data is not None:
         print("data:", json.dumps(result.data, indent=2))
     if result.approval_id:
-        print("approval_id:", result.approval_id, "(queued for human approval)")
+        route = {"same_user": "same-user confirmation",
+                 "segregated": "distinct approver (deal desk)"}.get(
+                     result.approval_route, result.approval_route)
+        print("approval_id:", result.approval_id, f"(queued for human approval -> {route})")
     if result.error:
         print("error:", json.dumps(result.error, indent=2))
 

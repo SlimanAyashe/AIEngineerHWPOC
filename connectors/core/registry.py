@@ -3,7 +3,7 @@
 ``invoke()`` is the ONE entry point an agent uses to call any tool. It enforces
 the full pipeline, in order:
 
-    validate input -> OBO token exchange -> policy gate -> (approval?) -> execute
+    validate input -> act-as-user (OBO) token exchange -> policy gate -> (approval?) -> execute
 
 and audits every decision and result. Read and write tools are registered from
 physically separate modules (``salesforce/reads.py`` vs ``salesforce/writes.py``)
@@ -18,7 +18,7 @@ from typing import Callable
 from .audit import audit_log, AuditRecord
 from .errors import ConnectorError, NotFoundError, UnauthorizedError, PolicyBlockedError
 from .identity import User, DownstreamToken, obo_exchange
-from .policy import ToolKind, Risk, Decision, evaluate
+from .policy import ToolKind, Risk, Decision, ApprovalRoute, evaluate
 from .validation import validate
 
 
@@ -31,6 +31,10 @@ class Tool:
     description: str
     input_schema: dict
     handler: Callable[[DownstreamToken, dict], dict]
+    # Only consulted when risk == HIGH (decision == APPROVAL_REQUIRED): who signs
+    # off. Defaults to the requesting rep (same-user confirmation); financially
+    # binding tools set SEGREGATED to require a distinct approver (deal desk).
+    approval_route: ApprovalRoute = ApprovalRoute.SAME_USER
 
 
 _REGISTRY: dict[str, Tool] = {}
@@ -63,6 +67,7 @@ class Result:
     data: dict | None = None
     error: dict | None = None
     approval_id: str | None = None
+    approval_route: str | None = None  # "same_user" | "segregated" when pending
     correlation_id: str | None = None
 
 
@@ -99,13 +104,19 @@ def invoke(tool_name: str, user: User, args: dict, correlation_id: str | None = 
             raise UnauthorizedError(f"Not permitted to call '{tool.name}'", details={"reason": reason})
         if decision == Decision.APPROVAL_REQUIRED:
             approval_id = _approval_ticket()
-            # In production: enqueue to Azure Service Bus, notify the approver, and
-            # execute the handler only after an authorized human approves.
+            # In production: enqueue to Azure Service Bus and notify the approver
+            # named by tool.approval_route -- the requesting rep (same-user
+            # confirmation) or a distinct deal-desk/manager (segregation of duties).
+            # On approval, the saved (correlation_id, validated args) are replayed
+            # and permissions are RE-VALIDATED at execution time (they may have
+            # changed since the request) before the handler runs.
             audit_log.record(AuditRecord(
                 correlation_id=cid, user_id=user.id, tool=tool.name, kind=tool.kind.value,
-                event="result", status="pending_approval", detail={"approval_id": approval_id},
+                event="result", status="pending_approval",
+                detail={"approval_id": approval_id, "approval_route": tool.approval_route.value},
             ))
-            return Result(status="pending_approval", approval_id=approval_id, correlation_id=cid)
+            return Result(status="pending_approval", approval_id=approval_id,
+                          approval_route=tool.approval_route.value, correlation_id=cid)
 
         # 4. Execute the handler with the user's delegated token.
         data = tool.handler(token, clean)

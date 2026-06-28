@@ -1,15 +1,25 @@
-"""Identity and simulated On-Behalf-Of (OBO) token exchange.
+"""Identity and simulated per-user "act-as-user" token exchange.
 
-In production this is real OAuth2: the user signs in via Microsoft Entra ID, and
-each connector exchanges the user's access token for a *downstream* token scoped
-to the target system (Salesforce API, Microsoft Graph for SharePoint, Jira) using
-the OAuth2 On-Behalf-Of grant. The downstream token represents THE USER, so every
-source system enforces that user's own permissions.
+In production the user signs in once via Microsoft Entra ID, and each connector
+obtains a *downstream* token that represents THE USER for its target system. The
+exact mechanism differs by system -- this is deliberately abstracted behind one
+``obo_exchange`` seam here, but it is NOT one uniform call in reality:
 
-Here we simulate the exchange with an in-memory directory. The property we keep
-faithful to production: the connector only ever acts with the *user's* delegated
-identity and scopes -- never a god-mode service account. This is what makes "the
-agent can never exceed the logged-in user" true in code.
+  * SharePoint (via Microsoft Graph): a true Entra ID **OAuth2 On-Behalf-Of**
+    grant (``grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer``) exchanges
+    the user's token for a Graph token acting as the user.
+  * Salesforce: its own OAuth authorization server. Entra federates *sign-in*
+    (SSO); the connector then brokers a per-user Salesforce token (e.g. SAML-
+    bearer assertion flow / connected app). Entra OBO does not itself mint a
+    Salesforce API token.
+  * Jira (Atlassian): likewise its own IdP/authz server (Atlassian 3LO). A
+    per-connector delegated OAuth flow brokers a per-user token.
+
+The principle is identical across all three and is what we keep faithful in code:
+the connector only ever acts with the *user's* delegated identity and scopes --
+never a god-mode service account. That is what makes "the agent can never exceed
+the logged-in user" true. Here we simulate every variant with an in-memory
+directory; only the token-minting plumbing differs in production.
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -64,13 +74,14 @@ def get_user(user_id: str) -> User:
 
 
 def obo_exchange(user: User, system: str) -> DownstreamToken:
-    """Simulate the OAuth2 On-Behalf-Of grant for one downstream system.
+    """Simulate the per-user "act-as-user" token exchange for one downstream system.
 
-    Real flow: POST to the Entra ID token endpoint with
-    ``grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer``, the user's token
-    as the assertion, and the target resource/scope. Entra returns a token scoped
-    to that resource, acting as the user. We approximate by projecting the user's
-    delegated scopes for ``system``; absence of any scope means no access.
+    Real flow depends on the system (see module docstring): a true Entra ID OBO
+    jwt-bearer grant for Microsoft Graph/SharePoint, or a per-connector delegated
+    OAuth token broker for Salesforce and Jira (which are their own authorization
+    servers). All three yield a token that acts as the user. We approximate by
+    projecting the user's delegated scopes for ``system``; absence of any scope
+    means no access.
     """
     system_scopes = frozenset(s for s in user.scopes if s.startswith(f"{system}."))
     if not system_scopes:

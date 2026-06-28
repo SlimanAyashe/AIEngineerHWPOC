@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from ..core.store import accounts, opportunities, tasks
 from ..core.errors import NotFoundError, UnauthorizedError
 from ..core.identity import DownstreamToken, get_user
-from ..core.policy import ToolKind, Risk
+from ..core.policy import ToolKind, Risk, ApprovalRoute
 from ..core.registry import Tool, register
 
 
@@ -89,8 +89,17 @@ register(Tool(
         "name": {"type": "string", "required": True, "min_length": 3, "max_length": 120},
         "amount": {"type": "number", "required": True, "min": 0},
     },
+    # A rep may create opportunities themselves -> the requesting rep confirms the
+    # agent's draft (deliberate-action checkpoint, not segregation of duties).
+    approval_route=ApprovalRoute.SAME_USER,
     handler=_create_opportunity,
 ))
+
+# Design note (Part 3): a "Create Quote" tool would register here too, but as
+#   risk=Risk.HIGH, approval_route=ApprovalRoute.SEGREGATED
+# because a quote financially binds the company -> a distinct deal-desk/manager
+# (not the requesting rep) must approve. Left out of the runnable POC for brevity;
+# the routing field above is the only difference in how the gate would handle it.
 
 register(Tool(
     name="salesforce.delete_opportunity",
